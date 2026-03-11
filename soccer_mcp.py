@@ -1,5 +1,7 @@
 # pip install fastmcp soccerdata pandas tabulate
 
+import os
+import asyncio
 import soccerdata as sd
 import pandas as pd
 from fastmcp import FastMCP
