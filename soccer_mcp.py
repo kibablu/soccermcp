@@ -61,12 +61,8 @@ def get_understat_shot_data(league: str, season: str) -> str:
     return df.head(30).to_markdown()
 
 if __name__ == "__main__":
-    # Cloud Run requires the server to listen on 0.0.0.0 and the assigned PORT
+    import os
+    # Get port from environment variable (Cloud Run sets this to 8080)
     port = int(os.getenv("PORT", 8080))
-    
-    # Use run_async with transport="streamable-http" for best Cloud Run compatibility
-    asyncio.run(mcp.run_async(
-        transport="streamable-http",
-        host="0.0.0.0",
-        port=port
-    ))
+    # Run as a web server
+    mcp.run(transport="sse", host="0.0.0.0", port=port)
