@@ -1,13 +1,13 @@
-# pip install fastmcp soccerdata pandas tabulate
-
 import os
-import asyncio
 import soccerdata as sd
 import pandas as pd
 from fastmcp import FastMCP
 
-# Define the cache directory (we'll mount the bucket here)
-CACHE_DIR = os.getenv("SOCCERDATA_DIR", "/app/cache")
+# IMPORTANT: Cloud Run file system is read-only. 
+# We must use /tmp for soccerdata to download and cache league data.
+CACHE_DIR = "/tmp/soccerdata"
+os.environ["SOCCERDATA_DIR"] = CACHE_DIR
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 # Initialize FastMCP Server
 mcp = FastMCP("Soccer Analytics Pro")
@@ -23,7 +23,6 @@ def get_fbref_league_table(league: str, season: str) -> str:
         season: Year format like '2324' or '2023'
     """
     fbref = sd.FBref(leagues=[league], seasons=[season])
-    # FBref's schedule often contains the standings info or use read_team_season_stats
     df = fbref.read_team_season_stats(stat_type="standard")
     return df.to_markdown()
 
@@ -35,7 +34,7 @@ def get_fbref_player_stats(league: str, season: str, stat_type: str = "standard"
     """
     fbref = sd.FBref(leagues=[league], seasons=[season])
     df = fbref.read_player_season_stats(stat_type=stat_type)
-    return df.head(50).to_markdown()  # Limiting to top 50 to save context space
+    return df.head(50).to_markdown()
 
 # --- Understat Tools (Advanced xG Metrics) ---
 
@@ -44,7 +43,7 @@ def get_understat_xg_stats(league: str, season: str) -> str:
     """
     Get advanced xG and xGA stats from Understat.
     Args:
-        league: IDs like 'ENG-Premier League', 'GER-Bundesliga', 'ITA-Serie A'
+        league: IDs like 'ENG-Premier League', 'GER-Bundesliga'
         season: Year like '2023' or '2324'
     """
     understat = sd.Understat(leagues=[league], seasons=[season])
@@ -61,8 +60,7 @@ def get_understat_shot_data(league: str, season: str) -> str:
     return df.head(30).to_markdown()
 
 if __name__ == "__main__":
-    import os
-    # Get port from environment variable (Cloud Run sets this to 8080)
+    # Cloud Run sets the PORT environment variable to 8080
     port = int(os.getenv("PORT", 8080))
-    # Run as a web server
+    # 'sse' transport turns this into a web server reachable via HTTP
     mcp.run(transport="sse", host="0.0.0.0", port=port)
