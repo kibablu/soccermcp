@@ -12,7 +12,7 @@ COPY pyproject.toml .
 
 # 3. Install dependencies
 # Because the source code isn't here yet, this layer stays cached!
-RUN uv pip install --system fastmcp soccerdata pandas tabulate
+RUN uv pip install --system fastmcp soccerdata pandas tabulate uvicorn
 
 # 4. NOW copy the rest of your source code
 # Since this is the last step, code changes won't trigger a re-install
