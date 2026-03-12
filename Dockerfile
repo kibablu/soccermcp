@@ -5,19 +5,21 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# 2. Copy ONLY the dependency files first
-# This layer is cached unless pyproject.toml or requirements.txt changes
+# 2. Copy dependency files
 COPY pyproject.toml . 
-# OR: COPY requirements.txt .
+# If you have requirements.txt instead, use: COPY requirements.txt .
 
-# 3. Install dependencies
-# Because the source code isn't here yet, this layer stays cached!
-RUN uv pip install --system fastmcp soccerdata pandas tabulate uvicorn
+# 3. Install dependencies 
+# Added sse-starlette which is required for transport="sse"
+RUN uv pip install --system fastmcp soccerdata pandas tabulate uvicorn sse-starlette
 
-# 4. NOW copy the rest of your source code
-# Since this is the last step, code changes won't trigger a re-install
+# 4. Copy source code
 COPY . .
+
+# Ensure the cache directory exists and is writable
+ENV SOCCERDATA_DIR=/tmp/soccerdata
 
 EXPOSE 8080
 
-CMD ["python", "soccer_server.py"]
+# Make sure the filename here matches your script name exactly
+CMD ["python", "soccer_mcp.py"]
