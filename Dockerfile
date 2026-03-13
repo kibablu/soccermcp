@@ -21,5 +21,4 @@ ENV SOCCERDATA_DIR=/tmp/soccerdata
 
 EXPOSE 8080
 
-# Make sure the filename here matches your script name exactly
 CMD ["python", "soccer_mcp.py"]
