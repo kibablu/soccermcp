@@ -1,0 +1,42 @@
+# Dockerfile.n8n
+FROM n8nio/n8n:${N8N_VERSION:-latest}
+
+# Switch to root user to install packages
+USER root
+
+# Set npm config for better caching
+RUN npm config set cache /tmp/npm-cache
+
+# Install required community packages
+# This layer will be cached if package list doesn't change
+RUN set -eux; \
+    # Update npm to latest
+    npm install -g npm@latest; \
+    # Create directory for custom nodes
+    mkdir -p /home/node/.n8n/custom
+
+# Copy package.json first for better layer caching
+# If you have a package.json with dependencies, uncomment this:
+# COPY package.json /tmp/package.json
+# RUN cd /home/node && npm install --production --no-audit --no-fund
+
+# Install the specific community node
+# This layer will be cached unless the package version changes
+RUN cd /home/node && \
+    npm install --no-audit --no-fund \
+    n8n-nodes-credentials-google-identity-token@latest
+
+# Set required environment variables for community packages
+ENV N8N_COMMUNITY_PACKAGES_ENABLED=true
+ENV N8N_UNVERIFIED_PACKAGES_ENABLED=true
+ENV N8N_COMMUNITY_PACKAGES='["n8n-nodes-credentials-google-identity-token"]'
+
+# Clean up npm cache to reduce image size
+RUN npm cache clean --force
+
+# Switch back to node user for security
+USER node
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:5678/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)})"
