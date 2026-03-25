@@ -1,5 +1,5 @@
-ARG N8N_VERSION
-FROM n8nio/n8n:${N8N_VERSION}
+# ARG N8N_VERSION
+FROM n8nio/n8n@sha256:72e962537379dcefeb63a01397a099576e2e89a365f5a75efb8a5ad5bc5cff6a
 
 # Switch to root user to install packages
 USER root
