@@ -1,5 +1,6 @@
-# ARG N8N_VERSION
-FROM n8nio/n8n@sha256:72e962537379dcefeb63a01397a099576e2e89a365f5a75efb8a5ad5bc5cff6a
+# Use the mirrored base image from Artifact Registry
+# This is much faster and more reliable than pulling from Docker Hub
+FROM us-central1-docker.pkg.dev/argocd-485507/soccermcp/n8n:2.13.2
 
 # Switch to root user to install packages
 USER root
@@ -8,20 +9,13 @@ USER root
 RUN npm config set cache /tmp/npm-cache
 
 # Install required community packages
-# This layer will be cached if package list doesn't change
 RUN set -eux; \
     # Update npm to latest
     npm install -g npm@latest; \
     # Create directory for custom nodes
     mkdir -p /home/node/.n8n/custom
 
-# Copy package.json first for better layer caching
-# If you have a package.json with dependencies, uncomment this:
-# COPY package.json /tmp/package.json
-# RUN cd /home/node && npm install --production --no-audit --no-fund
-
 # Install the specific community node
-# This layer will be cached unless the package version changes
 RUN cd /home/node && \
     npm install --no-audit --no-fund \
     n8n-nodes-credentials-google-identity-token@latest
