@@ -1,5 +1,5 @@
-# Dockerfile.n8n
-FROM n8nio/n8n:${N8N_VERSION:-latest}
+ARG N8N_VERSION
+FROM n8nio/n8n:${N8N_VERSION}
 
 # Switch to root user to install packages
 USER root
