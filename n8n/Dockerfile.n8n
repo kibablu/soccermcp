@@ -1,5 +1,6 @@
 # Stage 1: Pull and verify base image from Docker Hub
-FROM n8nio/n8n as base
+
+FROM n8nio/n8n:stable as base
 
 # Stage 2: Build custom image
 FROM base
