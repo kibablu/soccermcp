@@ -1,6 +1,8 @@
-# Use the mirrored base image from Artifact Registry
-# This is much faster and more reliable than pulling from Docker Hub
-FROM us-central1-docker.pkg.dev/argocd-485507/soccermcp/n8n:2.13.2@sha256:1d024e12c37b837ad3c6827380cbf290cd60fa0acb96bdf7d23c8590d52a6a78
+# Stage 1: Pull and verify base image from Docker Hub
+FROM n8nio/n8n:2.13.2 as base
+
+# Stage 2: Build custom image
+FROM base
 
 # Switch to root user to install packages
 USER root
