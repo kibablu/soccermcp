@@ -1,9 +1,4 @@
-# Stage 1: Pull and verify base image from Docker Hub
-
-FROM n8nio/n8n:stable as base
-
-# Stage 2: Build custom image
-FROM base
+FROM n8nio/n8n:stable
 
 # Switch to root user to install packages
 USER root
@@ -13,9 +8,7 @@ RUN npm config set cache /tmp/npm-cache
 
 # Install required community packages
 RUN set -eux; \
-    # Update npm to latest
     npm install -g npm@latest; \
-    # Create directory for custom nodes
     mkdir -p /home/node/.n8n/custom
 
 # Install the specific community node
@@ -28,10 +21,10 @@ ENV N8N_COMMUNITY_PACKAGES_ENABLED=true
 ENV N8N_UNVERIFIED_PACKAGES_ENABLED=true
 ENV N8N_COMMUNITY_PACKAGES='["n8n-nodes-credentials-google-identity-token"]'
 
-# Clean up npm cache to reduce image size
+# Clean up npm cache
 RUN npm cache clean --force
 
-# Switch back to node user for security
+# Switch back to node user
 USER node
 
 # Health check
