@@ -13,13 +13,16 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 # 2. Security Middleware (Check X-API-KEY)
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        # We only check headers for actual HTTP requests, not the background SSE stream
-        if request.url.path != "/":
-            expected_key = os.getenv("SOCCER_API_KEY", "your-fallback-key")
-            provided_key = request.headers.get("X-API-KEY")
+        # Allow the SSE handshake and health checks without API Key
+        # FastMCP often uses the root or /sse for the stream
+        if request.url.path in ["/", "/sse", "/health"]:
+            return await call_next(request)
             
-            if not provided_key or provided_key != expected_key:
-                return JSONResponse({"error": "Unauthorized: Invalid X-API-KEY"}, status_code=401)
+        expected_key = os.getenv("SOCCER_API_KEY", "your-fallback-key")
+        provided_key = request.headers.get("X-API-KEY")
+        
+        if not provided_key or provided_key != expected_key:
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
         
         return await call_next(request)
 
@@ -53,5 +56,6 @@ def get_understat_xg_stats(league: str, season: str) -> str:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
-    # Note: FastMCP with SSE transport defaults the endpoint to /sse
+    # Explicitly use the SSE transport. 
+    # In many FastMCP versions, the default SSE path is actually the root "/"
     mcp.run(transport="sse", host="0.0.0.0", port=port)
