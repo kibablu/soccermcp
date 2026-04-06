@@ -13,4 +13,7 @@ dependencies = [
     "soccerdata",
     "pandas",
     "tabulate",
+    "uvicorn",
+    "starlette",
+    "mcp"
 ]
