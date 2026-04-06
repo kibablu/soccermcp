@@ -55,7 +55,33 @@ def get_understat_xg_stats(league: str, season: str) -> str:
     return df.to_markdown()
 
 if __name__ == "__main__":
+    import uvicorn
+    from starlette.applications import Starlette
+    from starlette.routing import Route
+    from mcp.server.sse import SseServerTransport
+
+    # 1. Initialize the SSE transport
+    # This explicitly maps the POST endpoint to /messages
+    sse = SseServerTransport("/messages")
+
+    # 2. Define the Handlers
+    async def handle_sse(request):
+        async with sse.connect_sse(request.scope, request.receive, request._send) as (read_stream, write_stream):
+            await mcp.server.run(read_stream, write_stream, mcp.server.create_initialization_options())
+
+    async def handle_messages(request):
+        await sse.handle_post_message(request.scope, request.receive, request._send)
+
+    # 3. Explicitly map the routes n8n expects
+    app = Starlette(
+        routes=[
+            Route("/sse", endpoint=handle_sse), # GET handler
+            Route("/messages", endpoint=handle_messages, methods=["POST"]), # POST handler
+        ]
+    )
+    
+    # 4. Add your APIKeyMiddleware
+    app.add_middleware(APIKeyMiddleware)
+
     port = int(os.getenv("PORT", 8080))
-    # Explicitly use the SSE transport. 
-    # In many FastMCP versions, the default SSE path is actually the root "/"
-    mcp.run(transport="sse", host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
