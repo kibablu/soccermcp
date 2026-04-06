@@ -4,7 +4,9 @@ import pandas as pd
 from fastmcp import FastMCP
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
+from starlette.requests import Request
+import asyncio
 
 # 1. Environment & Cache Setup
 CACHE_DIR = "/tmp/soccerdata"
@@ -86,53 +88,61 @@ def get_available_leagues() -> str:
     }
     return str(leagues)
 
-@mcp.resource("health://status")
-def health_check() -> str:
-    """Health check endpoint."""
-    return "MCP Soccer Analytics Server is running"
-
 if __name__ == "__main__":
     import uvicorn
     from starlette.applications import Starlette
     from starlette.routing import Route
-    from starlette.responses import Response
     from mcp.server.sse import SseServerTransport
     
-    # 1. Initialize the SSE transport
-    # This explicitly maps the POST endpoint to /messages for n8n discovery
+    # Create SSE transport
     sse = SseServerTransport("/messages")
     
-    # 2. Define the Handlers
-    async def handle_sse(request):
-        """Handle SSE connection - supports both GET and POST for n8n compatibility"""
+    async def handle_sse(request: Request):
+        """Handle SSE connection for MCP"""
         try:
-            async with sse.connect_sse(request.scope, request.receive, request._send) as (read_stream, write_stream):
-                await mcp._server.run(
-                    read_stream, 
-                    write_stream, 
-                    mcp._server.create_initialization_options()
+            # Get the write stream from the SSE connection
+            async with sse.connect_sse(
+                request.scope,
+                request.receive,
+                request._send
+            ) as streams:
+                # Run the MCP server with the streams
+                await mcp.run_server(
+                    streams[0],  # read_stream
+                    streams[1],  # write_stream
+                    mcp.create_initialization_options()
                 )
         except Exception as e:
-            print(f"SSE connection error: {e}")
-            return JSONResponse({"error": f"SSE connection failed: {str(e)}"}, status_code=500)
+            print(f"Error in SSE handler: {e}")
+            return JSONResponse(
+                {"error": f"SSE connection failed: {str(e)}"},
+                status_code=500
+            )
     
-    async def handle_messages(request):
+    async def handle_messages(request: Request):
         """Handle POST messages for MCP tool calls"""
         try:
-            await sse.handle_post_message(request.scope, request.receive, request._send)
+            await sse.handle_post_message(
+                request.scope,
+                request.receive,
+                request._send
+            )
         except Exception as e:
-            print(f"Message handling error: {e}")
-            return JSONResponse({"error": f"Message handling failed: {str(e)}"}, status_code=500)
+            print(f"Error in messages handler: {e}")
+            return JSONResponse(
+                {"error": f"Message handling failed: {str(e)}"},
+                status_code=500
+            )
     
-    async def health_endpoint(request):
-        """Simple health check endpoint"""
+    async def health_endpoint(request: Request):
+        """Health check endpoint"""
         return JSONResponse({
             "status": "healthy",
             "service": "soccerdata-mcp",
             "endpoints": ["/sse", "/messages", "/health"]
         })
     
-    async def root_endpoint(request):
+    async def root_endpoint(request: Request):
         """Root endpoint with service info"""
         return JSONResponse({
             "service": "Soccer Analytics MCP Server",
@@ -141,34 +151,24 @@ if __name__ == "__main__":
                 "sse": "GET/POST - SSE connection endpoint",
                 "messages": "POST - MCP message endpoint",
                 "health": "GET - Health check"
-            },
-            "tools": [
-                "get_fbref_league_table",
-                "get_fbref_player_stats", 
-                "get_understat_xg_stats",
-                "get_understat_team_xg",
-                "get_available_leagues"
-            ]
+            }
         })
     
-    # 3. Explicitly map the routes n8n expects
-    # Allow both GET and POST on /sse for n8n compatibility
+    # Create the Starlette app
     app = Starlette(
         routes=[
-            Route("/sse", endpoint=handle_sse, methods=["GET", "POST"]),  # n8n expects POST
+            Route("/sse", endpoint=handle_sse, methods=["GET", "POST"]),
             Route("/messages", endpoint=handle_messages, methods=["POST"]),
             Route("/health", endpoint=health_endpoint, methods=["GET"]),
             Route("/", endpoint=root_endpoint, methods=["GET"]),
         ]
     )
     
-    # 4. Add middleware
+    # Add middleware
     app.add_middleware(APIKeyMiddleware)
-    
-    # 5. Add CORS middleware for n8n
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["https://klaudmazoezi.top"],  # In production, replace with your n8n domain
+        allow_origins=["https://klaudmazoezi.top"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -181,9 +181,10 @@ if __name__ == "__main__":
     print(f"Messages endpoint: http://localhost:{port}/messages (POST)")
     print(f"Health check: http://localhost:{port}/health")
     
+    # Run the server
     uvicorn.run(
-        app, 
-        host="0.0.0.0", 
+        app,
+        host="0.0.0.0",
         port=port,
         log_level="info"
     )
