@@ -13,16 +13,16 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 # 2. Security Middleware (Check X-API-KEY)
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        # Allow the SSE handshake and health checks without API Key
-        # FastMCP often uses the root or /sse for the stream
-        if request.url.path in ["/", "/sse", "/health"]:
+        # IMPORTANT: Allow /sse and /messages to pass through without API Key 
+        # to avoid interrupting the protocol handshake.
+        if request.url.path in ["/sse", "/messages", "/health", "/"]:
             return await call_next(request)
             
         expected_key = os.getenv("SOCCER_API_KEY", "your-fallback-key")
         provided_key = request.headers.get("X-API-KEY")
         
         if not provided_key or provided_key != expected_key:
-            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            return JSONResponse({"error": "Unauthorized: Invalid X-API-KEY"}, status_code=401)
         
         return await call_next(request)
 
@@ -61,13 +61,18 @@ if __name__ == "__main__":
     from mcp.server.sse import SseServerTransport
 
     # 1. Initialize the SSE transport
-    # This explicitly maps the POST endpoint to /messages
+    # This explicitly maps the POST endpoint to /messages for n8n discovery
     sse = SseServerTransport("/messages")
 
     # 2. Define the Handlers
     async def handle_sse(request):
+        # NOTE: FastMCP uses _server internally
         async with sse.connect_sse(request.scope, request.receive, request._send) as (read_stream, write_stream):
-            await mcp.server.run(read_stream, write_stream, mcp.server.create_initialization_options())
+            await mcp._server.run(
+                read_stream, 
+                write_stream, 
+                mcp._server.create_initialization_options()
+            )
 
     async def handle_messages(request):
         await sse.handle_post_message(request.scope, request.receive, request._send)
@@ -75,8 +80,8 @@ if __name__ == "__main__":
     # 3. Explicitly map the routes n8n expects
     app = Starlette(
         routes=[
-            Route("/sse", endpoint=handle_sse), # GET handler
-            Route("/messages", endpoint=handle_messages, methods=["POST"]), # POST handler
+            Route("/sse", endpoint=handle_sse), # GET handler for stream connection
+            Route("/messages", endpoint=handle_messages, methods=["POST"]), # POST handler for tools
         ]
     )
     
