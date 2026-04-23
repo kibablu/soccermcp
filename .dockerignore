@@ -5,3 +5,4 @@ npm-debug.log
 .terraform
 .terraform.lock.hcl
 terraform.tfstate
+terraform.tfvars
