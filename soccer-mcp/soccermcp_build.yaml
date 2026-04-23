@@ -1,0 +1,38 @@
+steps:
+  - name: gcr.io/kaniko-project/executor:latest
+    args:
+      - >-
+        --destination=${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}
+      - >-
+        --destination=${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:latest
+      - '--dockerfile=soccer-mcp/Dockerfile.soccer'
+      - '--context=dir://soccer-mcp/'
+      - '--cache=true'
+      - '--cache-ttl=24h'
+    id: build-and-push-soccer-image
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    args:
+      - run
+      - deploy
+      - soccerdata-mcp
+      - '--image'
+      - >-
+        ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_IMAGE_NAME}:${SHORT_SHA}
+      - '--region'
+      - ${_LOCATION}
+      - '--ingress'
+      - all
+      - '--allow-unauthenticated'
+      - '--service-account'
+      - n8n-runner@${PROJECT_ID}.iam.gserviceaccount.com
+    id: deploy-to-cloud-run
+    waitFor:
+      - build-and-push-soccer-image
+    entrypoint: gcloud
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _REPO_NAME: _REPO_NAME
+  _IMAGE_NAME: _IMAGE_NAME
+  _LOCATION: _LOCATION
